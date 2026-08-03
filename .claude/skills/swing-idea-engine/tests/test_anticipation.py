@@ -18,6 +18,17 @@ def check(name, cond):
     else:
         FAIL += 1; print(f"  FAIL {name}")
 
+def _raises(exc, fn):
+    """True if fn() raises exc. SystemExit is NOT swallowed — the whole point of the
+    fallback work is that a dead feed raises a catchable error, not a process exit."""
+    try:
+        fn()
+    except exc:
+        return True
+    except BaseException:
+        return False
+    return False
+
 def make_bars(prices, vols=None):
     """Build bars from a close series; simple OHLC around each close."""
     bars = []
@@ -101,6 +112,87 @@ check("cnbc down -> ONE-SOURCE", "ONE-SOURCE" in ds.cross_check("TEST",1.0)["ver
 def _yahoo_fail(ticker, tf="daily"): raise SystemExit("down")
 ds.fetch_yahoo = _yahoo_fail
 check("both down -> NO-DATA", ds.cross_check("TEST",1.0)["verdict"]=="NO-DATA")
+
+print("csv_fallback (degraded-mode path, offline):")
+import tempfile
+import csv_fallback as cf
+
+def _write_csv(path, bars, newest_first=False):
+    rows = list(reversed(bars)) if newest_first else bars
+    with open(path, "w") as fh:
+        fh.write("Date,Open,High,Low,Close,Volume\n")
+        for b in rows:
+            fh.write(f"{b.date},{b.o},{b.h},{b.l},{b.c},{int(b.v)}\n")
+    return path
+
+_tmp = tempfile.mkdtemp()
+_bars250 = make_bars([100 + math.sin(i / 5) for i in range(250)])
+# make_bars only emits 2-digit days; rewrite to real ISO dates so ordering is testable
+for _i, _b in enumerate(_bars250):
+    _b.date = f"2026-{(_i // 28) + 1:02d}-{(_i % 28) + 1:02d}"
+
+_spy = _write_csv(os.path.join(_tmp, "SPY.csv"), _bars250)
+_qqq = _write_csv(os.path.join(_tmp, "QQQ.csv"), _bars250)
+
+# 7. --csv parsing: explicit SYM=path pairs and bare paths
+check("parse_csv_map reads SYM=path pairs",
+      cf.parse_csv_map(f"SPY={_spy},QQQ={_qqq}") == {"SPY": _spy, "QQQ": _qqq})
+check("parse_csv_map infers symbol from bare filename",
+      cf.parse_csv_map(_spy) == {"SPY": _spy})
+
+# 8. --csv-dir maps every <SYMBOL>.csv, and explicit --csv wins over the directory
+check("csv_map_from_dir maps the directory", cf.csv_map_from_dir(_tmp) == {"SPY": _spy, "QQQ": _qqq})
+check("explicit --csv overrides --csv-dir",
+      cf.build_csv_map(f"SPY={_qqq}", _tmp)["SPY"] == _qqq)
+check("bad --csv-dir raises DataUnavailable",
+      _raises(cf.DataUnavailable, lambda: cf.csv_map_from_dir("/definitely/not/here")))
+
+# 9. Newest-first exports are normalised, so indicators aren't silently inverted
+_rev = _write_csv(os.path.join(_tmp, "REV.csv"), _bars250, newest_first=True)
+_rev_bars, _ = cf.resolve_bars("REV", csv_map={"REV": _rev}, allow_fetch=False)
+check("newest-first CSV is normalised to chronological",
+      _rev_bars[0].date < _rev_bars[-1].date)
+
+# 10. CSV beats the live feed, and the source note says so
+def _boom(ticker, tf="daily"):
+    raise SystemExit("network refused")
+_b, _note = cf.resolve_bars("SPY", csv_map={"SPY": _spy}, fetch=_boom)
+check("CSV takes precedence over the feed", len(_b) == 250)
+check("source note names the CSV", _note.startswith("CSV") and _spy in _note)
+
+# 11. A refused fetch degrades to DataUnavailable naming the remedy, not SystemExit
+try:
+    cf.resolve_bars("SPY", csv_map={}, fetch=_boom)
+    check("refused fetch raises DataUnavailable", False)
+except cf.DataUnavailable as e:
+    check("refused fetch raises DataUnavailable", True)
+    check("remedy message mentions --csv", "--csv" in str(e))
+except SystemExit:
+    check("refused fetch raises DataUnavailable", False)
+
+# 12. --offline never reaches the network
+def _must_not_call(ticker, tf="daily"):
+    raise AssertionError("fetch attempted in offline mode")
+check("offline mode never fetches",
+      _raises(cf.DataUnavailable,
+              lambda: cf.resolve_bars("SPY", csv_map={}, allow_fetch=False, fetch=_must_not_call)))
+
+print("scanners degrade end-to-end (offline):")
+
+# 13. squeeze_scan runs entirely from CSV
+_row = sq.scan_one("SPY", csv_map={"SPY": _spy}, allow_fetch=False)
+check("squeeze_scan scores from CSV", _row["readiness"] is not None)
+check("squeeze_scan labels the CSV source", _spy in _row["source"])
+
+# 14. regime_gate runs entirely from CSV — the flag its error message always promised
+_p = rg.posture("SPY", csv_map={"SPY": _spy}, allow_fetch=False)
+check("regime_gate reads posture from CSV", _p["state"] in ("CONSTRUCTIVE", "BEARISH", "MIXED"))
+check("regime_gate labels the CSV source", _spy in _p["source"])
+
+# 15. A missing symbol degrades to one NA row rather than killing the scan
+check("regime_gate surfaces DataUnavailable for an unsupplied symbol",
+      _raises(cf.DataUnavailable,
+              lambda: rg.posture("NOPE", csv_map={"SPY": _spy}, allow_fetch=False)))
 
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)
