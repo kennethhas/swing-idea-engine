@@ -32,7 +32,9 @@ break the "wrong" way. Educational analysis, not financial advice.
 Data
 ----
 Reuses zone_scanner's keyless Yahoo fetch + OHLC validation (same single unofficial feed;
-cross-check before trading). CSV input supported for offline / cross-source use.
+cross-check before trading). When that feed is unreachable, --csv / --csv-dir supply the
+bars per symbol (see csv_fallback.py); --offline requires them. A symbol with neither
+degrades to a NO-DATA row instead of killing the scan.
 
 Security
 --------
@@ -47,11 +49,13 @@ import statistics as stats
 
 # Reuse the audited primitives from the bundled scanner so there's ONE fetch/validate path.
 try:
-    from zone_scanner import fetch_yahoo, load_csv, validate_bars, atr, sma
+    from zone_scanner import validate_bars, atr, sma
+    from csv_fallback import DataUnavailable, build_csv_map, resolve_bars
 except ImportError:
     # allow running from the skill root
     sys.path.insert(0, __file__.rsplit("/", 1)[0])
-    from zone_scanner import fetch_yahoo, load_csv, validate_bars, atr, sma
+    from zone_scanner import validate_bars, atr, sma
+    from csv_fallback import DataUnavailable, build_csv_map, resolve_bars
 
 
 # ----------------------------- helpers -----------------------------
@@ -193,17 +197,13 @@ def classify(score):
 
 # ----------------------------- CLI -----------------------------
 
-def scan_one(ticker=None, csv_path=None):
-    if csv_path:
-        raw = load_csv(csv_path)
-        note = f"CSV {csv_path}"
-    else:
-        raw = fetch_yahoo(ticker, "daily")
-        note = f"Yahoo Finance ({ticker})"
+def scan_one(ticker, csv_map=None, allow_fetch=True):
+    raw, note = resolve_bars(ticker, "daily", csv_map=csv_map, allow_fetch=allow_fetch)
     bars, warnings = validate_bars(raw, note)
     score, detail = readiness(bars)
     return {
-        "ticker": ticker or csv_path,
+        "ticker": ticker,
+        "source": note,
         "close": round(bars[-1].c, 2) if bars else None,
         "as_of": bars[-1].date if bars else None,
         "readiness": score,
@@ -215,23 +215,39 @@ def scan_one(ticker=None, csv_path=None):
 
 def main():
     ap = argparse.ArgumentParser(description="Pre-momentum squeeze / coil detector (leading screen).")
-    src = ap.add_mutually_exclusive_group(required=True)
-    src.add_argument("--tickers", help="Comma-separated symbols, e.g. FTNT,FORM,AEHR")
-    src.add_argument("--csv", help="Single OHLC CSV (Date,Open,High,Low,Close[,Volume]).")
+    ap.add_argument("--tickers", help="Comma-separated symbols, e.g. FTNT,FORM,AEHR")
+    ap.add_argument("--csv",
+                    help="CSV fallback when the live feed is unreachable: 'SYM=path[,SYM2=path2]', "
+                         "or a bare path (symbol inferred from the filename). Combines with "
+                         "--tickers, where it overrides the feed per symbol.")
+    ap.add_argument("--csv-dir",
+                    help="Directory of <SYMBOL>.csv files to fall back on for any symbol.")
+    ap.add_argument("--offline", action="store_true",
+                    help="Never touch the network; require a CSV for every symbol.")
     ap.add_argument("--min-score", type=float, default=0.0,
                     help="Only print names at/above this readiness score.")
     args = ap.parse_args()
 
-    rows = []
-    if args.csv:
-        rows.append(scan_one(csv_path=args.csv))
+    try:
+        csv_map = build_csv_map(args.csv, args.csv_dir)
+    except DataUnavailable as e:
+        ap.error(str(e))
+
+    # Symbols come from --tickers; with only CSVs supplied, screen whatever they hold.
+    if args.tickers:
+        tickers = [x.strip().upper() for x in args.tickers.split(",") if x.strip()]
     else:
-        for t in [x.strip() for x in args.tickers.split(",") if x.strip()]:
-            try:
-                rows.append(scan_one(ticker=t))
-            except SystemExit as e:
-                rows.append({"ticker": t, "readiness": None, "state": "FETCH-FAILED",
-                             "detail": {"error": str(e)}, "warnings": []})
+        tickers = sorted(csv_map)
+    if not tickers:
+        ap.error("provide --tickers, or --csv/--csv-dir to supply symbols offline")
+
+    rows = []
+    for t in tickers:
+        try:
+            rows.append(scan_one(t, csv_map=csv_map, allow_fetch=not args.offline))
+        except (DataUnavailable, SystemExit) as e:
+            rows.append({"ticker": t, "close": None, "readiness": None, "state": "NO-DATA",
+                         "source": None, "detail": {"error": str(e)}, "warnings": []})
 
     # rank by readiness desc, NA last
     rows.sort(key=lambda r: (r["readiness"] is None, -(r["readiness"] or 0)))
@@ -251,8 +267,12 @@ def main():
             continue
         print(f"\n  {r['ticker']} @ {r.get('close')} (as of {r.get('as_of')}) "
               f"readiness={r['readiness']} — {r['state']}")
+        print(f"      source: {r.get('source') or 'NA'}")
         for k, v in r["detail"].items():
             print(f"      {k}: {v}")
+    if any(str(r.get("source", "")).startswith("CSV") for r in rows):
+        print("\nNOTE: at least one name read from CSV — contraction math is only as fresh "
+              "as the file. Re-verify before acting.")
     print("\nNote: leading screen, first pass. High readiness = watch for the trigger "
           "(reclaim/expansion candle + volume), not an entry by itself. Single unofficial "
           "feed — cross-check. Not financial advice.")

@@ -13,23 +13,29 @@ Not a forecast. It's a context filter: it states where the index sits relative t
 50/200 SMA and its recent range, deterministically. Educational, not financial advice.
 
 Reuses zone_scanner's keyless fetch + validation (single unofficial feed; cross-check).
+When that feed is unreachable, --csv / --csv-dir supply the bars instead (see
+csv_fallback.py) so Step 0 degrades to offline rather than failing the whole chain.
 """
 
 import argparse
 import sys
 
 try:
-    from zone_scanner import fetch_yahoo, validate_bars, sma
+    from zone_scanner import validate_bars, sma
+    from csv_fallback import DataUnavailable, build_csv_map, resolve_bars
 except ImportError:
     sys.path.insert(0, __file__.rsplit("/", 1)[0])
-    from zone_scanner import fetch_yahoo, validate_bars, sma
+    from zone_scanner import validate_bars, sma
+    from csv_fallback import DataUnavailable, build_csv_map, resolve_bars
 
 
-def posture(symbol):
-    raw = fetch_yahoo(symbol, "daily")
-    bars, warnings = validate_bars(raw, f"Yahoo Finance ({symbol})")
+def posture(symbol, csv_map=None, allow_fetch=True):
+    raw, source_note = resolve_bars(symbol, "daily",
+                                    csv_map=csv_map, allow_fetch=allow_fetch)
+    bars, warnings = validate_bars(raw, source_note)
     if len(bars) < 200:
-        return {"symbol": symbol, "state": "NA", "reason": "insufficient history"}
+        return {"symbol": symbol, "state": "NA", "source": source_note,
+                "reason": f"insufficient history ({len(bars)} bars; need 200)"}
     price = bars[-1].c
     s50 = sma(bars, 50)[-1]
     s200 = sma(bars, 200)[-1]
@@ -53,6 +59,7 @@ def posture(symbol):
         "symbol": symbol,
         "close": round(price, 2),
         "as_of": bars[-1].date,
+        "source": source_note,
         "state": state,
         "bias": bias,
         "vs_50sma": round(100 * (price / s50 - 1), 1),
@@ -78,13 +85,25 @@ def main():
     ap = argparse.ArgumentParser(description="Step-0 market regime gate (SPY/QQQ/SOXX posture).")
     ap.add_argument("--symbols", default="SPY,QQQ",
                     help="Index proxies to read (default SPY,QQQ; add SOXX for semis-heavy screens).")
+    ap.add_argument("--csv",
+                    help="CSV fallback when the live feed is unreachable: 'SYM=path[,SYM2=path2]', "
+                         "or a bare path (symbol inferred from the filename).")
+    ap.add_argument("--csv-dir",
+                    help="Directory of <SYMBOL>.csv files to fall back on for any symbol.")
+    ap.add_argument("--offline", action="store_true",
+                    help="Never touch the network; require a CSV for every symbol.")
     args = ap.parse_args()
+
+    try:
+        csv_map = build_csv_map(args.csv, args.csv_dir)
+    except DataUnavailable as e:
+        sys.exit(str(e))
 
     postures = []
     for s in [x.strip() for x in args.symbols.split(",") if x.strip()]:
         try:
-            postures.append(posture(s))
-        except SystemExit as e:
+            postures.append(posture(s, csv_map=csv_map, allow_fetch=not args.offline))
+        except (DataUnavailable, SystemExit) as e:
             postures.append({"symbol": s, "state": "NA", "reason": str(e)})
 
     print("Step 0 — Market Regime\n" + "-" * 60)
@@ -95,7 +114,10 @@ def main():
         print(f"  {p['symbol']} @ {p['close']} ({p['as_of']}): {p['state']} — {p['bias']}")
         print(f"      vs50={p['vs_50sma']}%  vs200={p['vs_200sma']}%  "
               f"loc-in-20d-range={p['loc_in_20d_range_pct']:.0f}%")
+        print(f"      source: {p.get('source','NA')}")
     print("\nVERDICT: " + verdict(postures))
+    if any(str(p.get("source", "")).startswith("CSV") for p in postures):
+        print("NOTE: at least one index read from CSV — levels are only as fresh as the file.")
     print("\nContext filter, not a forecast. Single unofficial feed — cross-check. Not financial advice.")
 
 

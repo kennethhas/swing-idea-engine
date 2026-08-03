@@ -75,6 +75,7 @@ market-regime gate first so every downstream long carries its regime context:
 
 ```bash
 python scripts/regime_gate.py --symbols SPY,QQQ           # add ,SOXX for semis-heavy screens
+python scripts/regime_gate.py --csv-dir ./bars --offline  # degraded mode: read SPY.csv/QQQ.csv
 ```
 
 - **GREENLIGHT** → demand-zone longs are with-regime; proceed normally.
@@ -113,6 +114,7 @@ Score the Task A universe for contraction, so you carry forward the names that a
 
 ```bash
 python scripts/squeeze_scan.py --tickers SYM1,SYM2,SYM3,... --min-score 0
+python scripts/squeeze_scan.py --csv-dir ./bars --offline   # degraded mode: one <SYM>.csv per name
 ```
 
 It returns a 0–100 **readiness** score per name from volatility contraction (ATR%
@@ -298,6 +300,8 @@ tables alone are fine.
 - `scripts/zone_scanner.py` — Step 2 Seiden/OTA zone detection + odds scoring + Excel.
 - `scripts/data_sources.py` — Step 3 cross-feed check (Yahoo vs CNBC, independent providers)
   so a level backed by only one feed, or where feeds disagree, gets flagged not traded.
+- `scripts/csv_fallback.py` — the degraded-mode path. Resolves bars per symbol from CSV
+  before touching the network, so a blocked or dead feed doesn't kill the run.
 - `tests/test_anticipation.py` — offline regression suite for the new scripts. Run it
   after any edit to `squeeze_scan.py`, `regime_gate.py`, or `data_sources.py`.
 
