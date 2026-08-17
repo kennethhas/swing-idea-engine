@@ -1,0 +1,9 @@
+# Python bytecode caches (generated when the skill scripts import each other)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local environment / tooling
+.venv/
+venv/
+.DS_Store
