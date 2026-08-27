@@ -35,6 +35,33 @@ Any R:R above ~15:1 is almost always an artifact of a stale or far target (the s
 labels the target source, e.g. "recent-swing (estimate)"). Treat it as **UNVERIFIED**,
 say so, and do not present it as a great trade. A far target is not an edge.
 
+## Trend-continuation override (uptrend near ATH) — don't headline a wholesale-fill fantasy
+
+The gates above assume a range/reversal trade into a resting zone. In a **confirmed
+uptrend where price is high on the curve / near ATH with no live supply overhead**, a
+demand zone far below price is NOT the setup — a strong trend rarely fills it, and
+leading with it makes Kenneth miss the continuation swing (the FTNT-129.70 failure:
+price ran to the 172 target and never offered the deep zone). When the nearest live
+demand is **>~7% below price**, override the emit:
+
+- **Entry = the continuation trigger, not the deep zone.** Either (a) the nearest
+  higher-low base holding above the deep zone (a shallow RBR the pullback is forming
+  into), or (b) a **reclaim-close above the last lower-high / broken swing / SMA20–50**
+  after the pullback (the reclaim logic already in the SKILL — applied to the broken
+  high, not only to the deep zone).
+- **Target = a projection** (measured move / prior high + ATR extension / round
+  number), labeled a projection — an ATH with no overhead zone is a valid `NA` for a
+  *zone* target but still a tradeable *projected* target for a continuation long.
+- **Deep demand zone = demote to a labeled backup** ("low-probability discount limit
+  only"), never the headline entry.
+- Gate R:R on the CONTINUATION trigger (usually smaller than the deep zone's — the
+  trade-off is higher fill probability for lower R:R). If it can't clear 3:1 on the
+  continuation trigger, say so honestly rather than swapping in the fantasy 12:1 to a
+  far ATH.
+
+Mirror, inverted, for a confirmed downtrend near lows (no live demand below → short
+continuation trigger, projected target, supply zone demoted to backup).
+
 ## Confidence rubric (replaces undefined letter grades)
 
 Retail prompts hand out "A+/A/B" or "High/Med/Low" with no definition — theater.

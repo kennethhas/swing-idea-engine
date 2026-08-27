@@ -191,6 +191,15 @@ opposing zone), Target 2 (next opposing zone, or `NA` if none — an ATH with no
 overhead zone is a valid `NA`), computed R:R, core score, and the confidence tier from
 the rubric.
 
+**Trend-continuation override (uptrend near ATH):** if the name is in a confirmed
+uptrend, high on the curve / near ATH with no live supply overhead, and the nearest
+live demand is **>~7% below price**, do NOT headline the deep zone — emit the
+**continuation trigger** as the entry (reclaim-close above the last lower-high, or the
+higher-low base holding), a **projected** Target 1, and demote the deep zone to a
+labeled "low-probability discount" backup. Gate R:R on the continuation trigger. Full
+rule in `references/gates-and-scoring.md` → "Trend-continuation override." This is the
+fix for the FTNT-129.70 miss: surface the reclaim entry, not the 15%-below fantasy.
+
 **Sanity-flag** any implausibly high R:R (e.g. >15:1) as an artifact of a stale/far
 target, exactly as the scanner warns — treat it as UNVERIFIED, don't sell it as a
 great trade.
@@ -206,6 +215,10 @@ wait-for-confirmation:
   asymmetric-reclaim-analyst; borrow it, don't reinvent it.
 - **Limit-in entry (acceptable only in GREENLIGHT regime on a fresh, high-score zone):**
   resting order at proximal, stop beyond distal, accepting first-touch risk.
+- **Continuation reclaim (near-ATH uptrend, per the override):** the entry is not the
+  deep zone at all — it is the reclaim-close above the last lower-high / broken swing
+  (or SMA20–50), or the nearest higher-low base holding, targeting a projection. A
+  gap-through of this trigger = no clean entry ("missed — gap"), never a chase.
 State which trigger applies per name. A coiled name (high readiness) that then prints the
 reclaim is the full anticipatory signal firing in sequence: coil → level → trigger.
 
