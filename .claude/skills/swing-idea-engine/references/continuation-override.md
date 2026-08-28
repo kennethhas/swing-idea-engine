@@ -126,3 +126,42 @@ and caught; it is the single most damaging failure mode in the whole chain.
 - Table 2 (off-the-radar discovery) is untouched — different horizon, different evidence.
 - Single-ticker deep dives are a separate skill and still use zone entries unless the
   user asks otherwise.
+
+---
+
+## Appendix — measuring O.E. "Strength" (pinned 2026-08-28)
+
+Reference Card 2 says the move-out leg and the structure break must each be
+"≥2:1" but never names the denominator. That gap caused a live flip-flop: BAC was
+scored 1/2, then 2/2, then back to 1/2 in one session, purely because the
+denominator changed. Pinning it here so it cannot drift again.
+
+**Use ATR at the formation bar. Never zone width.**
+
+Zone width is unstable: a narrow base makes every departure look explosive. The
+four zones measured on 2026-08-27 data:
+
+| Ticker | Zone width | Width ÷ ATR | move-out ÷ width | move-out ÷ ATR |
+|---|---|---|---|---|
+| CSCO | 0.55 | **0.26** | **14.1** | 3.6 |
+| AAPL | 5.19 | 0.62 | 4.1 | 2.5 |
+| XOM | 3.31 | 0.83 | 2.1 | 1.7 |
+| BAC | 1.04 | 0.88 | 2.0 | 1.7 |
+
+CSCO's zone is a quarter of an ATR wide, so dividing by it returns 14:1 for a
+departure that is 3.6 ATR — and 49:1 on a 5-bar window. Any measure that can
+report 49:1 is measuring the denominator, not the move. ATR is scale-stable
+across price levels and volatility regimes; use it.
+
+**The measurement, exactly:**
+
+- **move-out** = (highest high within 3 bars of the formation bar − proximal) ÷ ATR
+  at the formation bar. Passes at ≥ 2.0.
+- **structure break** = the post-formation high (30 bars) exceeds the highest
+  swing-pivot high of the 40 bars before formation. Binary.
+- Both pass → 2 · one → 1 · neither → 0.
+
+This is still a chosen denominator, not the card's — say so in every report, and
+show the raw ratio so the reader can overrule the category. It is the same class
+of error as the T2 base-height bug fixed earlier the same day: a ratio taken
+against a window that did not mean what it was assumed to mean.
