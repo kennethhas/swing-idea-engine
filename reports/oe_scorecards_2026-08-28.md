@@ -125,7 +125,7 @@ default `--leg-mult 1.6`, which is a point in its favour that the score does not
    need 1.3; BAC needs 1.0. The scan threshold required is itself a quality signal.
 4. **Nothing has live supply overhead.** Four for four. Read constructively that is bullish — no
    institutional selling parked above — but mechanically it makes the card's Profit Zone
-   unmeasurable, which is why the whole slate tops out at Confirmation.
+   unmeasurable, which is why the whole slate lands on NO TRADE.
 
 ## Method notes
 
