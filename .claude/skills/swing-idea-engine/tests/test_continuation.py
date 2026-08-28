@@ -91,6 +91,22 @@ if not r5a.get('cut') and not r5b.get('cut'):
     check("a rejection wick does NOT inflate the target",
           abs(r5a['target'] - r5b['target']) < 0.01)
 
+# --- base height is the BASE, not a fixed window ------------------------
+# Regression: base_h used min(L[-20:]), which reached past the base into any
+# crash low still inside the window and inflated T2 by 30%+.
+crash = uptrend_then_base()
+i = len(crash) - 19                       # inside the 20-bar window, before the base
+d, o, hi, lo, c = crash[i]
+crash[i] = (d, o, hi, lo * 0.75, c)       # a deep spike low, close unchanged
+r7a, r7b = cs.scan(uptrend_then_base(), "X"), cs.scan(crash, "X")
+if not r7a.get('cut') and not r7b.get('cut'):
+    check("a spike low outside the base does NOT inflate the base height",
+          abs(r7a['base_h'] - r7b['base_h']) < 0.01)
+    check("base height is measured from the stop's swing low",
+          abs(r7a['base_h'] - (r7a['trig'] - r7a['stop'])) < r7a['risk'])
+    check("T2 stays a sane distance above T1",
+          r7a['t2'] - r7a['target'] < 2.5 * (r7a['target'] - r7a['trig']))
+
 # --- min-rr is honoured -------------------------------------------------
 r6 = cs.scan(uptrend_then_base(), "STRICT", dict(min_rr=99.0))
 check("--min-rr cuts on reward", r6.get('cut') == 'R:R too thin')

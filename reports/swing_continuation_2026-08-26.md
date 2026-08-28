@@ -1,5 +1,12 @@
 # Continuation-Override Swing Screen
 
+> **⚠ SUPERSEDED — see `swing_continuation_2026-08-28.md`.** Two defects were found in this
+> report: **T2/R2 are wrong for ANET (248.31, should be 222.32) and XOM (185.80, should be
+> 177.46)** — a base-height bug, since fixed and regression-tested — and the as-of dates were
+> mixed (HWM/ANET 08-21, XOM 08-25) without being flagged. Entry, stop, risk, T1 and R:R were
+> verified correct against the raw bars. Outcome through 08-27: ANET triggered and ran +5.9%;
+> HWM and XOM never triggered and cost nothing.
+
 **Run:** 2026-08-26 · **Data:** through 2026-08-26 close (XOM 08-25, HWM/ANET 08-21) · **Regime:** SELECTIVE
 **Override applied:** entry = a TRIGGER LEVEL ABOVE price (reclaim of the nearest overhead resistance).
 No demand-zone limits below price. Anything whose only entry was a deep discount is CUT.

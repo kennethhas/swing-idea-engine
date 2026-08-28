@@ -33,6 +33,7 @@ Usage:
 """
 import argparse
 import csv
+import datetime
 import glob
 import json
 import os
@@ -168,8 +169,12 @@ def scan(bars, sym, cfg=None):
     higher_low = (hl > min(prior[-10:])) if len(prior) >= 3 else True
 
     # --- 6) projected target ---------------------------------------------
-    base_low = min(L[-20:])
-    base_h = trig - base_low
+    # Base height is measured from the SAME swing low the stop sits under, not
+    # from a fixed 20-session window. A fixed window reaches back past the base
+    # into whatever crash low happens to be in range (ANET's post-earnings
+    # 156.84, XOM's 149.09), turning "base height" into a number that has
+    # nothing to do with the base and inflating T2 by 30%+.
+    base_h = trig - hl
     lb = c['prior_high_lookback']
     prior_high = max(C[-lb:]) if n >= lb else max(C)   # highest CLOSE, wick-robust
     if trig < prior_high * 0.998:
@@ -193,7 +198,19 @@ def scan(bars, sym, cfg=None):
 
     tier = 'A' if (score >= 8 and rr >= 3) else ('B' if score >= 6 else 'C')
 
+    # History depth is not cosmetic: with n < 100 the trend gate falls back from
+    # SMA100 to SMA50, which makes gate 1 nearly free (s50 > s50*0.99 is always
+    # true), and with n < 120 the prior-high target is drawn from a shorter
+    # window. Rows computed that way are NOT comparable to full-history rows, so
+    # say so instead of printing them side by side unmarked.
+    weak = []
+    if s100[-1] is None:
+        weak.append('trend gate fell back to SMA50 (<100 bars)')
+    if n < c['prior_high_lookback']:
+        weak.append(f'prior high from {n} bars, not {c["prior_high_lookback"]}')
+
     return dict(
+        bars=n, weak=weak,
         sym=sym, asof=bars[-1][0], spot=round(spot, 2), trig=round(trig, 2),
         dist=round((trig / spot - 1) * 100, 1), stop=round(stop, 2),
         risk=round(risk, 2), risk_atr=round(risk / atr, 2),
@@ -235,10 +252,28 @@ def main():
     print(h)
     print('-' * len(h))
     for r in passes:
-        print(f"{r['sym']:6}{r['asof']:11}{r['spot']:>9}{r['trig']:>9}{r['dist']:>6}"
-              f"{r['stop']:>9}{r['risk']:>7}{r['risk_atr']:>6}{r['target']:>10}"
-              f"{r['rr']:>6}{r['t2']:>10}{r['rr2']:>6}{r['score']:>5}{r['tier']:>5}")
+        print(f"{r['sym'] + ('*' if r['weak'] else ''):6}{r['asof']:11}{r['spot']:>9}"
+              f"{r['trig']:>9}{r['dist']:>6}{r['stop']:>9}{r['risk']:>7}{r['risk_atr']:>6}"
+              f"{r['target']:>10}{r['rr']:>6}{r['t2']:>10}{r['rr2']:>6}{r['score']:>5}"
+              f"{r['tier']:>5}{r['bars']:>6}")
     print(f"\n{len(passes)} pass of {len(paths)} scanned (min R:R {a.min_rr})")
+
+    # Staleness is an accuracy problem, not a cosmetic one: a trigger computed
+    # off a bar from last week is not the level to set an alert on today.
+    asof = sorted({r['asof'] for r in passes})
+    if asof:
+        today = datetime.date.today().isoformat()
+        stale = [r['sym'] for r in passes if r['asof'] < asof[-1]]
+        print(f"data as-of: {asof[0]}" + (f" .. {asof[-1]}" if len(asof) > 1 else ""))
+        if asof[-1] < today:
+            print(f"  WARNING: newest bar is {asof[-1]}, today is {today} — "
+                  f"refresh before setting alerts.")
+        if stale:
+            print(f"  WARNING: mixed as-of dates; behind the newest bar: {', '.join(stale)}")
+    for r in passes:
+        if r['weak']:
+            print(f"  * {r['sym']}: " + '; '.join(r['weak']) +
+                  " — not directly comparable to full-history rows.")
 
     if a.show_cuts:
         print('\nCUT LOG')
