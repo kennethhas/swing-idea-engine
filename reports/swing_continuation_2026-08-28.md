@@ -8,9 +8,10 @@ session) · **Feed:** Massive/Polygon grouped daily aggregates
 
 | # | Ticker | Spot | **ENTRY = trigger** | Δ | Stop | Risk | Stop ×ATR | **T1** | R:R | T2 | R2 | Core | Tier | Bars | Earnings in window |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | **BAC** ⚠ | 61.17 | **62.12** | +1.6% | 60.84 | 1.28 | 1.22 | **65.33** | **2.51** | 66.35 | 3.30 | 8/9 | B | 103 | No — verified |
-| 2 | **XOM** | 156.44 | **158.71** | +1.5% | 155.29 | 3.42 | 1.00 | **173.18** | **4.23** | 175.75 | 4.98 | 7/9 | B | 184 | No — verified |
-| 3 | **AAPL** ⚠ | 314.58 | **316.29** | +0.5% | 305.48 | 10.81 | 1.77 | **343.13** | **2.48** | 352.41 | 3.34 | 7/9 | B | 96 | No — verified |
+| 1 | **CSCO** ⭐NEW | 112.15 | **113.85** | +1.5% | 108.41 | 5.44 | 1.66 | **131.63** | **3.27** | 136.25 | 4.12 | **8/9** | **A** | 164 | No — verified |
+| 2 | **BAC** ⚠ | 61.17 | **62.12** | +1.6% | 60.84 | 1.28 | 1.22 | **65.33** | **2.51** | 66.35 | 3.30 | 8/9 | B | 103 | No — verified |
+| 3 | **XOM** | 156.44 | **158.71** | +1.5% | 155.29 | 3.42 | 1.00 | **173.18** | **4.23** | 175.75 | 4.98 | 7/9 | B | 184 | No — verified |
+| 4 | **AAPL** ⚠ | 314.58 | **316.29** | +0.5% | 305.48 | 10.81 | 1.77 | **343.13** | **2.48** | 352.41 | 3.34 | 7/9 | B | 96 | No — verified |
 
 ⚠ **Short history — not directly comparable to the other rows.** AAPL has 96 bars, so the
 trend gate fell back from SMA100 to SMA50 (which makes gate 1 nearly free) and the
@@ -18,7 +19,14 @@ prior-high target is drawn from 96 sessions instead of 120. BAC's target is draw
 Treat AAPL's pass as provisional until its history is backfilled.
 
 **Theses**
-- **XOM** — the standout, and the only full-history row. Six straight down days took it from
+- **CSCO** — the only A-tier setup found in either run, and it comes from the widened
+  universe. It gapped down ~8% on 2026-08-12 earnings (123.88 → 113.47) and has spent the
+  eleven sessions since building a higher low at 109.23 rather than continuing lower. Trigger
+  113.85 is the last lower-high, 1.5% overhead. **Caveat worth stating: it sits 2.9% BELOW its
+  50-day** — the uptrend is confirmed on the 100-day, not the 50. That is a deeper pullback
+  than XOM's, which is exactly why the reward is there: the objective is the June high at
+  130.00 and the risk is only 5.44.
+- **XOM** — the cleanest full-history row. Six straight down days took it from
   164.05 to 156.44, but it is still 4.1% above a rising 50-day (150.22) and now sits 1.0 ATR
   under the first shelf. The selloff *improved* the setup: risk fell from 5.11 to 3.42 while
   the objective held, taking R:R from 2.26 to 4.23.
@@ -58,6 +66,10 @@ never entered.
 | EOG | R:R too thin | 1.49 |
 | **ANET** | Stop too wide | 3.17 ATR — it already ran; the entry is behind us |
 | FCX | **Extended — no chasing** | +19.8% over its 50-day, 2.87 ATR over its 20-day |
+| **WAT** | R:R too thin | 0.91 — printed a new high (426.22) on the last bar, so there is no shelf left to reclaim and the stop is 33.11 wide |
+| **DHR** | R:R too thin | 0.85 — trigger 220.67, T1 229.10, risk 9.94 |
+| **CSX** | R:R too thin | 0.63 — textbook coil under 52.15, but only 2.9% of room to the objective |
+| **OKE** | Stop too wide | 5.09 ATR |
 | 33 others | Not a confirmed uptrend | below the long MA or MAs unstacked |
 
 Same pattern as Monday: the failures are **R:R**, not lack of a coil. Tight bases everywhere,
@@ -93,9 +105,13 @@ silently weakens the trend gate. Rows built that way are now marked `*` with the
 
 ## Footer
 
-- **43 names scanned, 3 pass.** Universe is the cached working set — tilted toward energy,
-  financials, defense and AI-infra. Not a systematic universe; widen before treating an empty
-  result as a market-wide read.
+- **48 names scanned, 4 pass.** The universe was widened this run: a coarse market-wide
+  prescreen over ~12,500 US tickers (liquidity > $80M/day, price $10–2000, above the 78- and
+  120-session-ago closes, within 9% of a 4-point SMA50 proxy, coiling 0.2–8% under a recent
+  high) produced ~26 non-ETF candidates. Massive rate limits allowed history for five of them
+  — CSCO, CSX, DHR, OKE, WAT — of which **CSCO passed**. **~20 prescreen candidates are still
+  unfetched:** SNX, BRKR, KLMN, CDW, ET, EXPD, BIIB, ROIV, CINF, EG, RPRX, TROW, DGX, TRV,
+  VRSN, AMG, MDGL, VTRS, GWW, STT, VOYA. That is the open lead, not a conclusion.
 - **R:R gate 2:1**, a stated deviation from the zone model's 3:1. Continuation entries carry
   tighter stops and nearer targets; 3:1 empties the table. Raw R:R shown for every name — at
   3:1 today you get **XOM only**.
