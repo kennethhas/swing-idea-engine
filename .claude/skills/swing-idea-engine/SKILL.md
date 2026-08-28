@@ -66,6 +66,13 @@ depend on. Read `references/anticipation.md` for the pre-momentum layer (squeeze
 regime gate, multi-timeframe, and the entry trigger) — this is what makes the skill
 forward-looking rather than reactive.
 
+**Read `references/continuation-override.md` before every Task A run.** It is the
+**default entry model** and it overrides the zone-entry instructions in Step 2A below
+wherever the two disagree. In one line: *entry is a trigger LEVEL ABOVE price, never a
+demand-zone limit below it* — because limits under spot frequently never fill and the
+trend leaves without you. Zone analysis still runs, as context and as the source of
+overhead/underneath levels; it just no longer supplies the entry.
+
 ---
 
 ### STEP 0 — REGIME (is the tape even worth screening?)
@@ -195,19 +202,40 @@ the rubric.
 target, exactly as the scanner warns — treat it as UNVERIFIED, don't sell it as a
 great trade.
 
-**ENTRY TRIGGER — distinguish "early" from "wrong."** A resting zone tells you *where*;
-it does not tell you the swing has *started*. Buying blindly into a demand zone is how
-"anticipatory" quietly becomes "catching a falling knife." For each survivor, state the
-trigger that would confirm the move is beginning, so Kenneth can choose limit-in vs.
-wait-for-confirmation:
-- **Confirmation entry (default in SELECTIVE/CAUTION regimes):** wait for price to tag the
-  zone and print a reclaim — a candle that closes back above the proximal (demand) or below
-  it (supply) — ideally on expanding volume. This is the reclaim logic from
-  asymmetric-reclaim-analyst; borrow it, don't reinvent it.
-- **Limit-in entry (acceptable only in GREENLIGHT regime on a fresh, high-score zone):**
-  resting order at proximal, stop beyond distal, accepting first-touch risk.
-State which trigger applies per name. A coiled name (high readiness) that then prints the
-reclaim is the full anticipatory signal firing in sequence: coil → level → trigger.
+**A3) CONTINUATION OVERRIDE — this produces the entries. Run it on every Task A name.**
+
+```bash
+python scripts/continuation_scan.py --csv-dir <ohlc-dir> --show-cuts
+```
+
+Feed it one `<SYMBOL>.csv` per candidate (`Date,Open,High,Low,Close`), every bar a
+completed session retrieved live. It applies the six continuation gates in order and
+emits, per survivor: **trigger (the entry), stop, T1, T2, R:R, core score, tier**, plus
+a machine-generated cut log. Full spec, thresholds and the target model are in
+`references/continuation-override.md` — read it, don't re-derive it.
+
+**ENTRY TRIGGER — the entry IS a trigger, and it sits above price.** A resting zone
+tells you *where* a bounce could happen; it does not tell you the swing has started, and
+a limit under spot often never fills at all. So the deliverable entry is the level the
+name must **reclaim** to continue:
+- **Continuation trigger (default, every regime):** the nearest overhead resistance —
+  the last lower-high, or the shelf a higher-low base is coiling under. Take it on a
+  **close above** the trigger, not an intraday poke, ideally on expanding volume. Stop
+  under the marked higher-low the same session. This is the alert Kenneth sets.
+- **Zone limit-in entry (no longer offered by default):** only if the user explicitly
+  asks for a discount entry, or the regime is GREENLIGHT *and* the zone is fresh and
+  high-score. Otherwise a discount-only setup is **CUT**, not listed.
+A coiled name (high readiness) whose trigger then fires is the full anticipatory signal
+in sequence: regime → coil → level → trigger.
+
+**No chasing.** The override's counterweight is a hard extension ceiling — >2.2 ATR over
+the 20-day or >12% over the 50-day is a **CUT**, however good the structure looks. On a
+strong day this removes the most exciting names on the list. Report it as a cut with the
+number, and don't argue with it.
+
+**R:R gate deviation.** Continuation entries gate at **2:1**, not the zone model's 3:1
+(tighter stop, nearer ceiling — 3:1 returns an empty table in most tapes). Print the raw
+R:R for every name and **state the deviation once in the footer of every report.**
 
 **B) Discovery scoring — score every Task B name 1–5** on: (a) revenue growth vs.
 peers, (b) constraint/bottleneck position in its supply chain, (c) valuation vs.
@@ -244,14 +272,25 @@ If a required input is `NA`, the dependent score is `NA`. Don't invent it.
 
 **FINAL OUTPUT — always these two tables plus the footer:**
 
-**Table 1 — Swing Setups:** Ticker | Entry (proximal) | Stop (beyond distal) | T1 | T2 |
-R:R | Odds Score | Readiness (coil) | Tier | Trigger + regime flag | One-line zone logic |
-Data as-of timestamp
+**Table 1 — Swing Setups:** Ticker | Spot | **Entry = trigger (above spot)** | Δ to
+trigger | Stop | Risk | Stop ×ATR | T1 (projected) | R:R | T2 | Core score | Tier |
+Earnings in window | Data as-of
 
-Sort Table 1 by anticipatory conviction: names where **coil (≥55) + fresh gated zone +
-with-regime** all align go to the top and are labeled the highest-conviction setups. A
-gated zone with a low readiness score still lists, flagged "coil already released — level
-only."
+Every entry in this table must be **above spot** — that is the override, and it is
+auditable at a glance. If a row's entry is below spot, it does not belong in Table 1.
+Add a one-line thesis per name beneath the table, and state the trigger mechanics
+(close above, not a poke) once for the whole table.
+
+Sort Table 1 by conviction: **core score, then R:R.** Names where coil + confirmed
+uptrend + with-regime all align go to the top and are labeled the highest-conviction
+setups.
+
+**Table 2 in a continuation run is the CUT LOG** — ticker, cut reason, and the number
+that produced it. This is the more useful half of the output: it shows what the tape is
+actually refusing to offer. Group the reasons and say what the pattern means (e.g. "the
+failures are R:R, not lack of a coil — tight bases, no room to the ceiling"). The
+off-the-radar discovery table is a **separate, on-request deliverable**; do not run it
+inside the daily unless asked.
 
 **Table 2 — Off-the-Radar:** Ticker | Mkt Cap | Thesis | Catalyst + timing | Top risks |
 Kill trigger | Mispricing reason
@@ -296,6 +335,9 @@ tables alone are fine.
 - `scripts/regime_gate.py` — Step 0 market-regime posture (SPY/QQQ/SOXX).
 - `scripts/squeeze_scan.py` — Step 1 pre-momentum / coil detector (the anticipatory core).
 - `scripts/zone_scanner.py` — Step 2 Seiden/OTA zone detection + odds scoring + Excel.
+- `scripts/continuation_scan.py` — **Step 2 continuation override: the default entry
+  model.** Emits trigger/stop/T1/T2/R:R/score/tier + a cut log from a directory of OHLC
+  CSVs. Offline; no network. Run `tests/test_continuation.py` after any edit.
 - `scripts/data_sources.py` — Step 3 cross-feed check (Yahoo vs CNBC, independent providers)
   so a level backed by only one feed, or where feeds disagree, gets flagged not traded.
 - `tests/test_anticipation.py` — offline regression suite for the new scripts. Run it
@@ -308,3 +350,7 @@ tables alone are fine.
 - `references/anticipation.md` — the pre-momentum layer: the Regime→Coil→Level→Trigger
   sequence, how to read the squeeze scan, multi-timeframe, and the entry trigger. Read
   whenever running Task A.
+- `references/continuation-override.md` — **the default entry model.** Why entries sit
+  above price, the six gates and their thresholds, the target model and the two ways it
+  goes wrong, the no-chasing ceiling, and the disclosed 2:1 R:R deviation. Read before
+  every Task A run; it overrides the zone-entry text in Step 2A.
