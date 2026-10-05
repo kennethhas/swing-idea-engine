@@ -1,0 +1,3 @@
+# Python bytecode caches (generated when the skill's scripts import each other)
+__pycache__/
+*.py[cod]
