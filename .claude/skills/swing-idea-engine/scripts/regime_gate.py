@@ -19,15 +19,24 @@ import argparse
 import sys
 
 try:
-    from zone_scanner import fetch_yahoo, validate_bars, sma
+    from zone_scanner import fetch_yahoo, load_csv, validate_bars, sma
 except ImportError:
     sys.path.insert(0, __file__.rsplit("/", 1)[0])
-    from zone_scanner import fetch_yahoo, validate_bars, sma
+    from zone_scanner import fetch_yahoo, load_csv, validate_bars, sma
 
 
-def posture(symbol):
-    raw = fetch_yahoo(symbol, "daily")
-    bars, warnings = validate_bars(raw, f"Yahoo Finance ({symbol})")
+def posture(symbol, csv_path=None):
+    """Read one index proxy's posture. csv_path lets a caller supply bars from any
+    feed, which is required wherever the keyless Yahoo endpoint is unreachable
+    (blocked egress, offline runs) - the regime gate should not be the single
+    point of failure for the whole screen."""
+    if csv_path:
+        raw = load_csv(csv_path)
+        source = f"CSV ({csv_path})"
+    else:
+        raw = fetch_yahoo(symbol, "daily")
+        source = f"Yahoo Finance ({symbol})"
+    bars, warnings = validate_bars(raw, source)
     if len(bars) < 200:
         return {"symbol": symbol, "state": "NA", "reason": "insufficient history"}
     price = bars[-1].c
@@ -78,12 +87,28 @@ def main():
     ap = argparse.ArgumentParser(description="Step-0 market regime gate (SPY/QQQ/SOXX posture).")
     ap.add_argument("--symbols", default="SPY,QQQ",
                     help="Index proxies to read (default SPY,QQQ; add SOXX for semis-heavy screens).")
+    ap.add_argument("--csv", action="append", default=[], metavar="SYM=PATH",
+                    help="Supply bars for a symbol from a CSV instead of Yahoo, e.g. "
+                         "--csv SPY=csv/daily/SPY.csv. Repeatable. Use wherever the "
+                         "keyless Yahoo endpoint is unreachable.")
     args = ap.parse_args()
 
+    csv_map = {}
+    for item in args.csv:
+        if "=" not in item:
+            sys.exit(f"--csv expects SYM=PATH, got '{item}'")
+        sym, path = item.split("=", 1)
+        csv_map[sym.strip().upper()] = path.strip()
+
+    symbols = [x.strip() for x in args.symbols.split(",") if x.strip()]
+    for sym in csv_map:
+        if sym not in [s.upper() for s in symbols]:
+            symbols.append(sym)
+
     postures = []
-    for s in [x.strip() for x in args.symbols.split(",") if x.strip()]:
+    for s in symbols:
         try:
-            postures.append(posture(s))
+            postures.append(posture(s, csv_map.get(s.upper())))
         except SystemExit as e:
             postures.append({"symbol": s, "state": "NA", "reason": str(e)})
 
