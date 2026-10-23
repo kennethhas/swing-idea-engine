@@ -19,14 +19,16 @@ import argparse
 import sys
 
 try:
-    from zone_scanner import fetch_yahoo, validate_bars, sma
+    from zone_scanner import fetch_yahoo, load_csv, validate_bars, sma
 except ImportError:
     sys.path.insert(0, __file__.rsplit("/", 1)[0])
-    from zone_scanner import fetch_yahoo, validate_bars, sma
+    from zone_scanner import fetch_yahoo, load_csv, validate_bars, sma
 
 
-def posture(symbol):
-    raw = fetch_yahoo(symbol, "daily")
+def posture(symbol, csv_path=None):
+    """Read one index's posture. csv_path lets Step 0 run with no network
+    (the bundled Yahoo fetch is unavailable in locked-down environments)."""
+    raw = load_csv(csv_path) if csv_path else fetch_yahoo(symbol, "daily")
     bars, warnings = validate_bars(raw, f"Yahoo Finance ({symbol})")
     if len(bars) < 200:
         return {"symbol": symbol, "state": "NA", "reason": "insufficient history"}
@@ -78,12 +80,24 @@ def main():
     ap = argparse.ArgumentParser(description="Step-0 market regime gate (SPY/QQQ/SOXX posture).")
     ap.add_argument("--symbols", default="SPY,QQQ",
                     help="Index proxies to read (default SPY,QQQ; add SOXX for semis-heavy screens).")
+    ap.add_argument("--csv", action="append", default=[], metavar="SYM=PATH",
+                    help="Read a symbol from a local OHLC CSV instead of the network, "
+                         "e.g. --csv SPY=/tmp/SPY.csv. Repeatable.")
     args = ap.parse_args()
+
+    csv_map = {}
+    for item in args.csv:
+        if "=" not in item:
+            sys.exit(f"--csv expects SYM=PATH, got '{item}'")
+        k, v = item.split("=", 1)
+        csv_map[k.strip().upper()] = v.strip()
+    if csv_map and args.symbols == "SPY,QQQ":
+        args.symbols = ",".join(csv_map)
 
     postures = []
     for s in [x.strip() for x in args.symbols.split(",") if x.strip()]:
         try:
-            postures.append(posture(s))
+            postures.append(posture(s, csv_map.get(s.upper())))
         except SystemExit as e:
             postures.append({"symbol": s, "state": "NA", "reason": str(e)})
 

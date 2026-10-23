@@ -14,6 +14,47 @@ A name failing ANY gate is **CUT, not downgraded**. Cutting is the point of the 
 | Zone status | live only | live only | A zone price has closed through is invalidated — never a live entry |
 | Side of price | correct side | correct side | Demand only below price, supply only above |
 
+## The target rule (added after the Oct-2026 audit)
+
+**A zone's target MUST be a real opposing live zone.** A demand zone targets the
+nearest live supply above it; a supply zone targets the nearest live demand below.
+
+If this timeframe has none, the scanner escalates to any higher-timeframe levels
+passed via `--opposing-from <csv>`. If there is still none, it reports
+**NO-TARGET**: `target`, `rr_ratio` and `rr_to_stop` are all `None`, `rr_score`
+is 0, and the zone cannot pass the gates. **No target = no trade.**
+
+The scanner used to substitute the 60-bar swing extreme instead. That fabricated
+absurd R:R (MU printed 116:1) which a separate sanity check then flagged as
+"implausibly high", so the zone was cut anyway — with a misleading reason. The
+audit found **59% of live zones carried a fabricated target**.
+
+### Why "no opposing zone" is so common — and what to do about it
+
+A zone can only have a target if an *opposing* zone is live in the same scan.
+Measured over 15 liquid large-caps:
+
+| Scan | zones/name | live/name | both sides present |
+|---|---|---|---|
+| daily 1y, `--leg-mult 1.6` (default) | 1.4 | 0.6 | **0%** |
+| daily 1y, `--leg-mult 1.3` | 3.9 | 1.2 | 27% |
+| daily 1y, `--leg-mult 1.1` | 8.3 | 2.5 | 60% |
+| daily 2y, `--leg-mult 1.6` | 3.6 | 0.9 | 7% |
+
+At the default setting on daily bars, **no name had both a demand and a supply
+zone live**, so no target could ever be found. The zone map is too sparse at that
+sensitivity. WFC on the same dates: weekly → 1 zone, daily → 1 zone, **240min → 4
+zones, both sides present**.
+
+Order of preference when a zone has no target:
+1. **Scan a lower timeframe** (240min/4H) — the map is denser and usually supplies
+   both sides. This is what `deep-dive-swing` does, and why it produces tradeable
+   targets where the daily swing scan does not.
+2. Pass the weekly in with `--opposing-from` — cheap, but it rescued only 2 of 25
+   zones in the audit; the weekly is sparser still.
+3. Re-run daily at `--leg-mult 1.3` and tag every zone it finds **LOW-CONVICTION**.
+4. Otherwise report NO-TARGET and move on. Never invent a level.
+
 ## The R:R-to-actual-stop rule (critical)
 
 The scanner's headline `R:R` column frequently measures reward:risk to the **distal
